@@ -1,0 +1,1 @@
+"""File storage layer — raw PDFs, parsed text, summaries."""

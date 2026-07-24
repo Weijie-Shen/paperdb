@@ -1,0 +1,11 @@
+labels:
+  factor_research: 因子研究 — factor construction, testing, IC analysis, decay
+  strategy_research: 策略研究 — investment strategies, signal generation
+  asset_pricing: 资产定价 — factor models, CAPM, APT, SDF
+  portfolio_construction: 组合构建 — optimization, constraints, risk budgeting
+  risk_model: 风险模型 — covariance estimation, Barra-style
+  market_microstructure: 市场微观结构 — order book, bid-ask spread, market impact
+  trading_cost_execution: 交易成本/执行 — TCA, VWAP/TWAP, optimal execution
+  technical_factor: 技术因子 — indicators, technical signals, momentum/reversal patterns
+  value_factor: 价值因子 — valuation, profitability, quality, growth, fundamental value signals
+  price_and_volume_factor: 价量因子 — price/volume behavior, turnover, liquidity, volatility, order-flow signals

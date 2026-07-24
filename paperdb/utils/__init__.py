@@ -1,0 +1,1 @@
+"""Utility functions — hashing, text normalization, ID generation."""

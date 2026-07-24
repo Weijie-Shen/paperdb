@@ -1,0 +1,223 @@
+version: 1
+name: paperdb_agent_eval
+description: >
+  Evaluation cases for testing whether a Hermes or AgentMatrix agent can use
+  PaperDB skills to search, ingest, classify, summarize, and manage downloads
+  correctly.
+
+global_rules:
+  valid_research_area_labels:
+    - factor_research
+    - strategy_research
+    - asset_pricing
+    - portfolio_construction
+    - risk_model
+    - market_microstructure
+    - trading_cost_execution
+  valid_factor_family_labels:
+    - technical_factor
+    - value_factor
+    - price_and_volume_factor
+  invalid_removed_labels_must_not_appear:
+    - ml_deep_learning
+    - multi_factor
+    - backtesting
+    - style_factor
+    - alternative_data
+    - sentiment
+  required_invariants:
+    - Every ingested paper must have at least one valid research-area label.
+    - Factor-family labels are optional and must be limited to the configured three labels.
+    - Label source should default to ai_auto.
+    - Label confidence must be stored when assigned.
+    - Do not create or rely on a manual label-review queue.
+    - Do not fabricate titles, authors, institutions, GitHub URLs, or download URLs.
+    - Use metadata-first arXiv ingest unless a case explicitly asks for PDF download.
+    - Related GitHub URL may be stored only when explicitly specified by the paper, abstract page, PDF, or project page.
+
+scoring:
+  total_points: 100
+  dimensions:
+    relevance:
+      points: 25
+      description: Ingested papers match the case topic and are not obvious false positives.
+    search_strategy:
+      points: 15
+      description: Queries are source-appropriate and include China/A-share/finance constraints where needed.
+    metadata_quality:
+      points: 15
+      description: Title, authors, date, source_url, download_url, abstract, and GitHub fields are accurate when available.
+    classification_quality:
+      points: 20
+      description: Labels, confidence scores, market, frequency, and language are valid and defensible.
+    workflow_correctness:
+      points: 15
+      description: Uses metadata-first arXiv, deduplicates, avoids manual review queue, and delays downloads appropriately.
+    reporting_quality:
+      points: 10
+      description: Final report clearly states what was found, labels, confidence, access status, and uncertainty.
+  pass_threshold: 75
+  hard_fail_conditions:
+    - Uses any invalid_removed_labels_must_not_appear label.
+    - Fabricates a GitHub URL.
+    - Downloads arXiv PDFs during discovery without explicit instruction.
+    - Reports unclassified new papers as complete.
+
+cases:
+  - id: a_share_factor_search
+    type: discovery_and_classification
+    priority: high
+    prompt: >
+      Find 5 papers about Chinese A-share factor research. Prefer medium- or
+      low-frequency studies. Use metadata-first ingestion and classify all new
+      papers.
+    expected_behavior:
+      - Generate English arXiv queries with China, Chinese stock, A-share, factor, alpha, asset pricing, or anomaly terms.
+      - Use Chinese web queries for broker/Chinese sources if web tools are available.
+      - Ingest only papers plausibly related to equity factors, anomalies, asset pricing, or quantitative stock selection.
+      - Assign factor_research to relevant factor papers.
+      - Set market to a_share when the paper is clearly about Chinese A-shares.
+      - Set frequency to daily, weekly, monthly, quarterly, low_freq, or unclear based on evidence.
+      - Keep arXiv papers queued with download_url retained unless explicitly asked to download.
+    suggested_checks:
+      - paperdb query --label factor_research --market a_share --limit 20 --json
+      - paperdb download-status
+    minimum_success:
+      relevant_ingested_count: 3
+      max_obvious_false_positives: 1
+
+  - id: price_volume_technical_factors
+    type: discovery_and_classification
+    priority: high
+    prompt: >
+      Find papers or reports about price-volume factors, technical indicators,
+      momentum, reversal, liquidity, turnover, or volatility signals in China
+      equities. Classify with the simplified taxonomy.
+    expected_behavior:
+      - Use factor_research plus price_and_volume_factor when signals are based on price, volume, turnover, liquidity, volatility, or order-flow data.
+      - Use technical_factor when the paper clearly studies chart indicators, technical rules, momentum/reversal indicators, or technical analysis.
+      - Avoid old labels such as style_factor or multi_factor.
+      - Avoid classifying generic machine learning papers as factor research unless there is a finance/factor connection.
+    suggested_checks:
+      - paperdb query --label price_and_volume_factor --limit 20 --json
+      - paperdb query --label technical_factor --limit 20 --json
+    minimum_success:
+      relevant_ingested_count: 2
+      max_obvious_false_positives: 1
+
+  - id: portfolio_risk_models
+    type: discovery_and_classification
+    priority: medium
+    prompt: >
+      Find papers relevant to portfolio construction or risk models for Chinese
+      or emerging equity markets. Classify and summarize them.
+    expected_behavior:
+      - Use portfolio_construction for optimization, allocation, constraints, risk budgeting, or portfolio formation papers.
+      - Use risk_model for covariance estimation, factor risk models, Barra-style models, risk decomposition, or risk forecasting.
+      - Use asset_pricing only when the paper is primarily about pricing models or expected returns.
+      - Set market to a_share, emerging_market, global, or unclear depending on evidence and current allowed market values.
+    suggested_checks:
+      - paperdb query --label portfolio_construction --limit 20 --json
+      - paperdb query --label risk_model --limit 20 --json
+    minimum_success:
+      relevant_ingested_count: 2
+      max_obvious_false_positives: 1
+
+  - id: github_repo_capture
+    type: metadata_quality
+    priority: high
+    prompt: >
+      Find papers in quantitative finance, factor research, portfolio
+      construction, or asset pricing that explicitly provide related GitHub
+      repositories. Ingest metadata and preserve the GitHub links.
+    expected_behavior:
+      - Search for papers with explicit code/GitHub mentions.
+      - Store github_url only when a repository link is visible in the paper metadata, abstract page, PDF, or official project page.
+      - Do not infer repositories from author names or paper titles.
+      - Report papers where no GitHub link was found separately; do not fill github_url for them.
+    suggested_checks:
+      - paperdb query --limit 100 --json
+      - Inspect records where github_url is non-null.
+    minimum_success:
+      github_links_correct_count: 2
+      fabricated_github_links: 0
+
+  - id: classify_existing_unlabeled
+    type: classification_only
+    priority: high
+    prompt: >
+      Classify up to 10 existing unlabeled papers in the database. Use the
+      current research-area labels and optional factor-family labels only.
+      Preserve confidence scores.
+    expected_behavior:
+      - Query papers once in JSON and identify records with empty labels.
+      - Read enough title/abstract metadata to assign labels defensibly.
+      - Add at least one research-area label per paper.
+      - Set market, frequency, and language when evidence is available.
+      - Use lower confidence rather than creating a manual review queue when uncertain.
+    suggested_checks:
+      - paperdb query --limit 100 --json
+      - paperdb label list
+    minimum_success:
+      classified_count: 5
+      invalid_labels: 0
+
+  - id: arxiv_noise_filter
+    type: negative_control
+    priority: high
+    prompt: >
+      Search arXiv for factor, alpha, neural, and China-related terms, but only
+      ingest papers relevant to quantitative finance, economics, asset pricing,
+      or statistical methods applicable to finance. Avoid unrelated computer
+      vision, astrophysics, biology, or general machine learning papers.
+    expected_behavior:
+      - Inspect titles and abstracts before ingestion.
+      - Skip obvious non-finance false positives even if they match keywords.
+      - Explain skipped categories in the final report.
+      - Do not use PDF download during filtering.
+    suggested_checks:
+      - Review newly ingested titles and abstracts.
+      - paperdb query --source-type academic_paper --limit 20 --json
+    minimum_success:
+      max_obvious_false_positives: 1
+      skipped_noise_examples_reported: true
+
+  - id: delayed_download_workflow
+    type: workflow
+    priority: medium
+    prompt: >
+      Find 3 relevant arXiv papers, ingest metadata first, classify them, and
+      then download only the papers that are clearly relevant.
+    expected_behavior:
+      - Use paperdb arxiv ingest without --download during discovery.
+      - Classify/filter before download.
+      - Use paperdb download or paperdb download-missing only after relevance is established.
+      - Report access_status and download outcomes.
+    suggested_checks:
+      - paperdb download-status
+      - paperdb query --access-status downloaded --limit 10 --json
+    minimum_success:
+      relevant_ingested_count: 2
+      downloaded_after_classification: true
+
+run_record_template:
+  filename: "runs/YYYY-MM-DD-<case-id>.md"
+  fields:
+    - case_id
+    - date
+    - agent_or_model
+    - database_snapshot_or_notes
+    - prompt_used
+    - queries_generated
+    - commands_or_api_calls_used
+    - papers_ingested
+    - labels_assigned
+    - github_urls_stored
+    - downloads_attempted
+    - obvious_false_positives
+    - missed_requirements
+    - scores_by_dimension
+    - final_score
+    - pass_fail
+    - notes_for_skill_improvement
+

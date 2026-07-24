@@ -1,0 +1,51 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "paperdb"
+version = "0.1.0"
+description = "AI-driven paper search engine for Chinese A-share quant research"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+authors = [
+    {name = "PaperDB Contributors"}
+]
+dependencies = [
+    "pyyaml>=6.0",
+    "click>=8.1",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "pytest-cov>=4.0",
+]
+api = [
+    "fastapi>=0.110",
+    "uvicorn[standard]>=0.27",
+    "httpx2>=0.28",
+    "arxiv>=2.0",
+]
+all = [
+    "fastapi>=0.110",
+    "uvicorn[standard]>=0.27",
+    "httpx2>=0.28",
+    "jieba>=0.42",
+    "chromadb>=0.4",
+    "sentence-transformers>=2.2",
+    "arxiv>=2.0",
+    "requests>=2.28",
+    "pymupdf>=1.23",
+]
+
+[project.scripts]
+paperdb = "paperdb.cli:main"
+paperdb-api = "paperdb.api.app:main"
+
+[tool.setuptools.packages.find]
+include = ["paperdb*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

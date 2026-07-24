@@ -1,0 +1,17 @@
+connectors:
+  arxiv:
+    enabled: true
+    categories:
+    - q-fin.ST
+    - q-fin.PM
+    - q-fin.RM
+    - stat.ML
+    - cs.LG
+  choice:
+    enabled: true
+    requires_auth: true
+    auth_type: terminal
+  semantic_scholar:
+    enabled: true
+search_defaults:
+  max_results: 50

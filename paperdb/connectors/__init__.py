@@ -1,0 +1,1 @@
+"""Source connectors — structured APIs and scraping for paper discovery."""

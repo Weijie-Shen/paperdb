@@ -1,0 +1,37 @@
+institutions:
+- name: 华泰证券
+  priority: 1
+  aliases: [华泰证券股份有限公司, Huatai Securities, HTSC]
+  research_teams:
+  - 金融工程组
+  - 策略组
+- name: 国泰君安
+  priority: 1
+  aliases: [国泰君安证券, Guotai Junan Securities]
+  research_teams:
+  - 金融工程组
+- name: 中金公司
+  priority: 1
+  aliases: [中国国际金融股份有限公司, China International Capital Corporation, CICC]
+- name: 中信证券
+  priority: 2
+  aliases: [中信证券股份有限公司, CITIC Securities]
+- name: 海通证券
+  priority: 2
+- name: 广发证券
+  priority: 2
+  aliases: [广发证券股份有限公司, GF Securities]
+- name: 招商证券
+  priority: 2
+  aliases: [招商证券股份有限公司, China Merchants Securities]
+- name: 申万宏源
+  priority: 2
+- name: 兴业证券
+  priority: 3
+- name: 东方证券
+  priority: 3
+- name: 天风证券
+  priority: 3
+- name: 方正证券
+  priority: 3
+authors: []

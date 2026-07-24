@@ -1,0 +1,1 @@
+"""Configuration loading — taxonomy, watchlist, sources, embedding."""

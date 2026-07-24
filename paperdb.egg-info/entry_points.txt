@@ -1,0 +1,3 @@
+[console_scripts]
+paperdb = paperdb.cli:main
+paperdb-api = paperdb.api.app:main

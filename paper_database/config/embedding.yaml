@@ -1,0 +1,6 @@
+backend: local
+local:
+  model: BAAI/bge-large-zh-v1.5
+  device: auto
+openai:
+  model: text-embedding-3-small

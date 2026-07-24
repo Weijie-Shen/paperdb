@@ -1,0 +1,33 @@
+# PaperDB requirements
+# Install: pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
+
+# Core
+pyyaml>=6.0
+click>=8.1
+
+# arXiv connector
+arxiv>=2.0
+lxml>=6.1
+
+# Chinese search (FTS5 + jieba)
+jieba>=0.42
+
+# PDF reading (for paper-import skill)
+pymupdf>=1.23
+
+# HTTP (web downloads)
+requests>=2.28
+
+# API (optional for the frontend/backend service)
+fastapi>=0.110
+uvicorn[standard]>=0.27
+httpx2>=0.28
+arxiv>=2.0
+
+# Dev
+pytest>=7.0
+pytest-cov>=4.0
+
+# Vector search (optional — large download, install separately if needed)
+# sentence-transformers>=2.2
+# chromadb>=0.4
