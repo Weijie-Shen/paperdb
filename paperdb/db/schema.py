@@ -14,7 +14,7 @@ from typing import Optional
 # ---------------------------------------------------------------------------
 # Schema version — bump when schema changes; used for future migrations
 # ---------------------------------------------------------------------------
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 
 
 def _pragmas(conn: sqlite3.Connection) -> None:
@@ -181,6 +181,44 @@ CREATE TABLE IF NOT EXISTS download_logs (
 );
 """
 
+CREATE_PAPER_ASSESSMENTS = """
+CREATE TABLE IF NOT EXISTS paper_assessments (
+    paper_id                   TEXT PRIMARY KEY REFERENCES papers(id) ON DELETE CASCADE,
+    research_type              TEXT NOT NULL,
+    decision                   TEXT NOT NULL,
+    rejection_reasons          TEXT NOT NULL DEFAULT '[]',
+    quality_score              INTEGER,
+    quality_breakdown          TEXT NOT NULL DEFAULT '{}',
+    evidence_json              TEXT NOT NULL DEFAULT '{}',
+    strategy_family            TEXT,
+    signal_family              TEXT,
+    universe                   TEXT,
+    benchmark                  TEXT,
+    holding_period             TEXT,
+    rebalance_frequency        TEXT,
+    long_only                  INTEGER,
+    test_start                 TEXT,
+    test_end                   TEXT,
+    test_months                INTEGER,
+    annualized_return          REAL,
+    max_drawdown               REAL,
+    transaction_costs_included INTEGER,
+    transaction_cost_details   TEXT,
+    leverage_used              INTEGER,
+    intraday                   INTEGER,
+    a_share_rules_compliant    INTEGER,
+    out_of_sample              INTEGER,
+    turnover                   TEXT,
+    factor_formula             TEXT,
+    backtest_method            TEXT,
+    backtest_results           TEXT,
+    updated_at                 TEXT NOT NULL DEFAULT (datetime('now')),
+    CHECK (research_type IN ('strategy', 'factor_report')),
+    CHECK (decision IN ('qualified', 'rejected', 'unverified')),
+    CHECK (quality_score IS NULL OR (quality_score BETWEEN 0 AND 100))
+);
+"""
+
 
 # ---------------------------------------------------------------------------
 # Indexes
@@ -209,6 +247,8 @@ INDEXES = [
     "CREATE INDEX IF NOT EXISTS idx_candidates_decision ON search_candidates(decision);",
     "CREATE INDEX IF NOT EXISTS idx_paper_institutions_paper ON paper_institutions(paper_id);",
     "CREATE INDEX IF NOT EXISTS idx_paper_institutions_canonical ON paper_institutions(canonical_name);",
+    "CREATE INDEX IF NOT EXISTS idx_assessments_type_decision ON paper_assessments(research_type, decision);",
+    "CREATE INDEX IF NOT EXISTS idx_assessments_quality ON paper_assessments(quality_score DESC);",
 ]
 
 
@@ -222,6 +262,7 @@ ALL_TABLES = [
     CREATE_SEARCH_CANDIDATES,
     CREATE_PAPER_INSTITUTIONS,
     CREATE_DOWNLOAD_LOGS,
+    CREATE_PAPER_ASSESSMENTS,
 ]
 
 
@@ -285,6 +326,7 @@ def _ensure_schema_compat(conn: sqlite3.Connection) -> None:
     conn.execute(CREATE_SEARCH_CANDIDATES)
     conn.execute(CREATE_PAPER_INSTITUTIONS)
     conn.execute(CREATE_DOWNLOAD_LOGS)
+    conn.execute(CREATE_PAPER_ASSESSMENTS)
     for table, additions in {
         "search_logs": {
             "inspected_count": "INTEGER NOT NULL DEFAULT 0",
@@ -316,6 +358,8 @@ def _ensure_schema_compat(conn: sqlite3.Connection) -> None:
     conn.execute("CREATE INDEX IF NOT EXISTS idx_candidates_decision ON search_candidates(decision)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_paper_institutions_paper ON paper_institutions(paper_id)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_paper_institutions_canonical ON paper_institutions(canonical_name)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_assessments_type_decision ON paper_assessments(research_type, decision)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_assessments_quality ON paper_assessments(quality_score DESC)")
     conn.commit()
 
 

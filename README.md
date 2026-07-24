@@ -1,6 +1,12 @@
-# PaperDB — AI-Driven Paper Search Engine for Quant Research
+# PaperDB — A-share Strategy Research Search Engine
 
-PaperDB is an AI-operated research intake system that discovers, downloads, classifies, and organizes papers and broker reports for quantitative finance research, with a primary focus on **Chinese A-share markets** (medium- to low-frequency trading).
+PaperDB discovers, downloads, and screens academic papers and broker reports
+for **medium- and low-frequency Chinese A-share strategies**. Strategy papers
+must pass strict full-text performance gates; factor reports use a separate
+formula-and-backtest completeness test.
+
+The authoritative screening rules, 100-point quality rubric, evidence schema,
+and CLI examples are in [docs/strategy-screening.md](docs/strategy-screening.md).
 
 It has two operation modes:
 - **CLI mode**: direct commands for `init`, `ingest`, `search`, `query`, `stats`
@@ -130,6 +136,8 @@ failures from being mistaken for success.
 | `paperdb query --label factor_research --label price_and_volume_factor` | Papers with ALL specified labels |
 | `paperdb query --search "动量" --institution 华泰` | Keyword + institution filter |
 | `paperdb query --date-from 2025-01 --date-to 2025-12` | Date range filter |
+| `paperdb query --research-type strategy --decision qualified` | Qualified strategies only |
+| `paperdb query --research-type factor_report --decision qualified` | Qualified factor reports |
 | `paperdb reject <paper-id> --reason ...` | Mark a record out of scope without assigning a fake finance label |
 | `paperdb query --include-rejected` | Include rejected and archived records in an audit query |
 | `paperdb search-metrics` | Show returned/inspected/accepted/rejected counts and inspection yield |
@@ -155,6 +163,9 @@ Run `paperdb index rebuild` after bulk imports or whenever search results seem s
 | `paperdb label add <paper_id> <label> --confidence 0.72` | Assign a lower-confidence label |
 | `paperdb label list` | List all labels by frequency |
 | `paperdb label list --source ai_auto` | List AI-assigned labels |
+| `paperdb assessment apply <paper_id> --file assessment.json` | Apply deterministic full-text screening |
+| `paperdb assessment show <paper_id>` | Show evidence, decision, and component scores |
+| `paperdb assessment rubric` | Show the six-part 100-point rubric |
 
 ### Summaries
 

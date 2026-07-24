@@ -1,74 +1,56 @@
-# Agent Evaluation Run
+# Strategy Search Evaluation Run
 
 ## Metadata
 
 - Case ID:
 - Date:
 - Agent/model:
-- Operator:
 - Database snapshot or notes:
 
-## Prompt Used
+## Search Evidence
 
-```text
+- Queries:
+- Sources searched:
+- Candidates inspected:
+- Papers downloaded:
+- Source and download links:
 
-```
+## Candidate Decisions
 
-## Queries Generated
-
-- arXiv:
-- Web:
-- Other:
-
-## Commands Or API Calls Used
-
-```bash
-
-```
-
-## Papers Ingested
-
-| Paper ID | Title | Source | Relevant? | Notes |
-|---|---|---|---|---|
-
-## Labels Assigned
-
-| Paper ID | Labels | Confidence | Market | Frequency | Language | Correct? |
+| Title | Source | Abstract claims | Full text? | Type | Decision | Rejection reasons |
 |---|---|---|---|---|---|---|
 
-## GitHub URLs Stored
+## Strategy Evidence
 
-| Paper ID | GitHub URL | Evidence Location | Correct? |
-|---|---|---|---|
+| Paper ID | Main strategy | Universe | Frequency | Test months | Annualized return | Max drawdown | Costs included | Leverage | A-share legal | Evidence pages/tables |
+|---|---|---|---|---:|---:|---:|---|---|---|---|
 
-## Downloads
+## Factor Report Evidence
 
-| Paper ID | Download Attempted? | Timing | Result |
-|---|---|---|---|
+| Paper ID | Complete formula | Backtest method | Backtest results | Evidence pages/tables |
+|---|---|---|---|---|
+
+## Qualified Strategy Scores
+
+| Paper ID | Backtest /25 | Costs /15 | OOS & robustness /20 | Length & recency /15 | Clarity /15 | Source /10 | Total /100 |
+|---|---:|---:|---:|---:|---:|---:|---:|
 
 ## Errors And False Positives
 
-- Obvious false positives:
-- Fabricated metadata:
-- Invalid labels:
+- False positives:
+- Fabricated or unsupported evidence:
 - Missed requirements:
 
-## Scoring
+## Evaluation Score
 
-| Dimension | Points Available | Points Awarded | Notes |
+| Dimension | Available | Awarded | Notes |
 |---|---:|---:|---|
-| Relevance | 25 |  |  |
-| Search strategy | 15 |  |  |
-| Metadata quality | 15 |  |  |
-| Classification quality | 20 |  |  |
-| Workflow correctness | 15 |  |  |
-| Reporting quality | 10 |  |  |
+| Discovery precision | 20 | | |
+| Evidence accuracy | 25 | | |
+| Hard-gate correctness | 25 | | |
+| Quality-score consistency | 20 | | |
+| Auditability | 10 | | |
 
-Final score:
-
-Pass/fail:
-
-## Notes For Skill Improvement
-
--
-
+- Final score:
+- Pass/fail:
+- Improvements:

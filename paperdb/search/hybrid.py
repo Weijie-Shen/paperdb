@@ -84,17 +84,21 @@ class HybridSearcher:
             List of ``(paper_id, fused_score)`` tuples.
         """
         if mode == "keyword" or not self._vector_available:
-            return self._keyword_search(query, limit, filters)
+            return self._strategy_rerank(
+                self._keyword_search(query, limit * 2, filters)
+            )[:limit]
 
         if mode == "vector":
-            return self._vector_search(query, limit, filters)
+            return self._strategy_rerank(
+                self._vector_search(query, limit * 2, filters)
+            )[:limit]
 
         # Hybrid: RRF fusion
         kw_results = self._keyword_search(query, limit * 2, filters)
         vec_results = self._vector_search(query, limit * 2, filters)
 
         fused = reciprocal_rank_fusion(kw_results, vec_results)
-        return fused[:limit]
+        return self._strategy_rerank(fused)[:limit]
 
     # ------------------------------------------------------------------
     # Internal
@@ -140,6 +144,11 @@ class HybridSearcher:
                 elif col == "date_to":
                     where.append("publication_date <= ?")
                     params.append(val)
+                elif col in ("research_type", "decision"):
+                    where.append(
+                        f"id IN (SELECT paper_id FROM paper_assessments WHERE {col} = ?)"
+                    )
+                    params.append(val)
 
         where_clause = " AND ".join(where)
         rows = self.conn.execute(
@@ -158,3 +167,29 @@ class HybridSearcher:
         if not self._vector_available:
             return []
         return self.vector.search(query, limit=limit, filters=filters)
+
+    def _strategy_rerank(self, results):
+        """Prefer verified strategies, then factor reports, without hiding candidates."""
+        if not results:
+            return []
+        ids = [paper_id for paper_id, _ in results]
+        placeholders = ",".join("?" for _ in ids)
+        rows = self.conn.execute(
+            f"""SELECT paper_id, research_type, decision, quality_score
+                FROM paper_assessments WHERE paper_id IN ({placeholders})""",
+            ids,
+        ).fetchall()
+        assessments = {row["paper_id"]: row for row in rows}
+        reranked = []
+        for paper_id, score in results:
+            row = assessments.get(paper_id)
+            boost = 0.0
+            if row:
+                if row["decision"] == "qualified" and row["research_type"] == "strategy":
+                    boost = 0.20 + (row["quality_score"] or 0) / 1000
+                elif row["decision"] == "qualified":
+                    boost = 0.08
+                elif row["decision"] == "unverified":
+                    boost = 0.02
+            reranked.append((paper_id, score + boost))
+        return sorted(reranked, key=lambda item: (-item[1], item[0]))

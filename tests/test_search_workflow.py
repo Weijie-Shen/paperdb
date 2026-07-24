@@ -10,7 +10,8 @@ from paperdb.connectors.base import DownloadResult, PaperMetadata
 from paperdb.db.schema import init_db
 from paperdb.ingest import download_paper_file, ingest_from_metadata
 from paperdb.search.quality import (
-    assess_candidate, generate_query_variants, record_candidate, validate_metadata,
+    assess_candidate, extract_performance_claims, generate_query_variants,
+    record_candidate, validate_metadata,
 )
 from paperdb.storage.file_store import FileStore
 
@@ -30,6 +31,23 @@ def test_finance_assessment_accepts_finance_and_rejects_noise():
     noise = metadata("Host Galaxy and Black Hole Alpha Factors")
     noise.abstract = "An astrophysics study of a galaxy and black hole."
     assert assess_candidate(noise).decision == "rejected"
+
+
+def test_discovery_rejects_intraday_and_non_a_share_candidates():
+    intraday = metadata("Intraday A-share factor trading strategy")
+    intraday.abstract = "A high-frequency intraday backtest on Chinese A-shares."
+    assert assess_candidate(intraday).decision == "rejected"
+
+    us = metadata("S&P 500 momentum strategy")
+    us.abstract = "A daily backtest for US equities and the S&P 500."
+    assert assess_candidate(us).decision == "rejected"
+
+
+def test_abstract_performance_claims_are_only_extracted_as_evidence():
+    claims = extract_performance_claims(
+        "The annualized return is 35.2% and maximum drawdown is -8.4%."
+    )
+    assert claims == {"annualized_return": 35.2, "max_drawdown": 8.4}
 
 
 def test_query_variants_are_complementary_and_market_constrained():

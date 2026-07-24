@@ -218,6 +218,11 @@ class VectorSearcher:
             elif col == "date_to":
                 conditions.append("publication_date <= ?")
                 params.append(val)
+            elif col in ("research_type", "decision"):
+                conditions.append(
+                    f"id IN (SELECT paper_id FROM paper_assessments WHERE {col} = ?)"
+                )
+                params.append(val)
 
         if conditions:
             where = " AND ".join(conditions)

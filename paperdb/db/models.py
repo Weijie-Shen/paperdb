@@ -83,7 +83,7 @@ class Paper:
     priority_score: int = 0
     quality_flag: str = "ok"          # ok | needs_review | duplicate_suspected | broken
     metadata_quality: str = "partial" # verified | partial | suspicious
-    quality_screening_status: str = "metadata_only"  # metadata_only | full_text_available | quality_screened | insufficient_evidence
+    quality_screening_status: str = "metadata_only"  # metadata_only | full_text_available | quality_screened | unverified
     lifecycle_status: str = "active"  # active | rejected_out_of_scope | archived
     ingestion_batch: Optional[str] = None
     added_by: Optional[str] = None

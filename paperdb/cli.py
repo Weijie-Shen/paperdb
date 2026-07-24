@@ -334,6 +334,10 @@ def ingest_metadata_cmd(
 @click.option("--search", default=None, help="Keyword search in title and abstract")
 @click.option("--access-status", "access_filter", default=None, help="Filter by access status")
 @click.option("--language", "lang_filter", default=None, help="Filter by language")
+@click.option("--research-type", type=click.Choice(["strategy", "factor_report"]), default=None,
+              help="Filter by structured research type")
+@click.option("--decision", type=click.Choice(["qualified", "rejected", "unverified"]), default=None,
+              help="Filter by full-text qualification decision")
 @click.option("--lifecycle-status", default="active", help="Filter lifecycle status (default: active)")
 @click.option("--include-rejected", is_flag=True, help="Include rejected/archived records")
 @click.option("--limit", default=50, type=int, help="Max results (default: 50)")
@@ -341,7 +345,8 @@ def ingest_metadata_cmd(
 @click.option("--json", "output_json", is_flag=True, help="Output as JSON")
 def query(
     root, label, market_filter, source_type_filter, inst_filter,
-    date_from, date_to, search, access_filter, lang_filter, lifecycle_status, include_rejected,
+    date_from, date_to, search, access_filter, lang_filter, research_type, decision,
+    lifecycle_status, include_rejected,
     limit, offset, output_json,
 ):
     """Search and filter papers in the database."""
@@ -404,12 +409,24 @@ def query(
             where.append("language = ?")
             params.append(lang_filter)
 
+        if research_type:
+            where.append("id IN (SELECT paper_id FROM paper_assessments WHERE research_type = ?)")
+            params.append(research_type)
+
+        if decision:
+            where.append("id IN (SELECT paper_id FROM paper_assessments WHERE decision = ?)")
+            params.append(decision)
+
         where_clause = " AND ".join(where)
         count_sql = f"SELECT COUNT(*) FROM papers WHERE {where_clause}"
         total = conn.execute(count_sql, params).fetchone()[0]
 
         sql = f"""SELECT * FROM papers WHERE {where_clause}
-                  ORDER BY priority_score DESC, publication_date DESC
+                  ORDER BY COALESCE((
+                      SELECT quality_score FROM paper_assessments
+                      WHERE paper_id = papers.id
+                  ), -1) DESC,
+                  priority_score DESC, publication_date DESC
                   LIMIT ? OFFSET ?"""
         rows = conn.execute(sql, params + [limit, offset]).fetchall()
 
@@ -422,6 +439,7 @@ def query(
                     "SELECT label FROM paper_labels WHERE paper_id = ?", (paper["id"],)
                 ).fetchall()
                 paper["labels"] = [l["label"] for l in labels]
+                paper["assessment"] = _assessment_payload(conn, paper["id"])
                 results.append(paper)
             click.echo(json.dumps({"total": total, "limit": limit, "offset": offset, "results": results}, ensure_ascii=False, indent=2))
         else:
@@ -473,12 +491,16 @@ def info(paper_id, root, output_json):
                ORDER BY priority_score DESC, canonical_name""",
             (row["id"],),
         ).fetchall()
+        assessment = conn.execute(
+            "SELECT * FROM paper_assessments WHERE paper_id = ?", (row["id"],)
+        ).fetchone()
 
         if output_json:
             paper = dict(row)
             paper["labels"] = [{"label": l["label"], "confidence": l["confidence"], "source": l["source"]} for l in labels]
             paper["authors"] = [{"name": a["author_name"], "institution": a["institution"]} for a in authors]
             paper["institution_matches"] = [dict(match) for match in institution_matches]
+            paper["assessment"] = _assessment_payload(conn, row["id"])
             click.echo(json.dumps(paper, ensure_ascii=False, indent=2))
         else:
             click.echo(f"\n{'='*70}")
@@ -515,6 +537,14 @@ def info(paper_id, root, output_json):
             click.echo(f"Lifecycle:   {row['lifecycle_status']}")
             click.echo(f"Metadata:    {row['metadata_quality']}")
             click.echo(f"Screening:   {row['quality_screening_status']}")
+            if assessment:
+                click.echo(f"Research:    {assessment['research_type']}")
+                click.echo(f"Decision:    {assessment['decision']}")
+                if assessment["quality_score"] is not None:
+                    click.echo(f"Quality:     {assessment['quality_score']}/100")
+                reasons = json.loads(assessment["rejection_reasons"] or "[]")
+                if reasons:
+                    click.echo(f"Reasons:     {', '.join(reasons)}")
             if row["access_notes"]:
                 click.echo(f"Access note: {row['access_notes']}")
             if row["file_path"]:
@@ -721,6 +751,143 @@ def label_list(root, source_filter):
 
 
 # ---------------------------------------------------------------------------
+# strategy/factor assessment
+# ---------------------------------------------------------------------------
+
+@main.group("assessment")
+def assessment():
+    """Record auditable full-text strategy and factor qualification."""
+
+
+@assessment.command("apply")
+@click.argument("paper_id")
+@click.option("--file", "assessment_file", required=True, type=click.Path(exists=True, dir_okay=False),
+              help="JSON file containing research_type, evidence, and strategy quality scores")
+@click.option("--root", default=None, help="Paper database root directory")
+@click.option("--json", "output_json", is_flag=True, help="Output as JSON")
+def assessment_apply(paper_id, assessment_file, root, output_json):
+    """Evaluate and store a strategy or factor report from verified full text."""
+    r = _resolve_root(root)
+    conn, config, file_store = _get_db(r)
+    try:
+        row = conn.execute(
+            "SELECT id, file_path, access_status FROM papers WHERE id = ? OR id LIKE ?",
+            (paper_id, f"{paper_id}%"),
+        ).fetchone()
+        if not row:
+            raise click.ClickException(f"Paper not found: {paper_id}")
+
+        try:
+            payload = json.loads(Path(assessment_file).read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            raise click.ClickException(f"Invalid assessment JSON: {exc}") from exc
+
+        from paperdb.strategy_assessment import (
+            FactorEvidence,
+            QualityBreakdown,
+            StrategyEvidence,
+            assess_factor_report,
+            assess_strategy,
+            save_assessment,
+        )
+
+        research_type = payload.get("research_type")
+        evidence_data = payload.get("evidence") or {}
+        # Qualification is impossible without a locally retained full text.
+        if (
+            not row["file_path"]
+            or row["access_status"] != "downloaded"
+            or not file_store.exists(row["file_path"])
+        ):
+            evidence_data["full_text_verified"] = False
+
+        try:
+            if research_type == "strategy":
+                evidence = StrategyEvidence(**evidence_data)
+                quality_data = payload.get("quality")
+                quality = QualityBreakdown(**quality_data) if quality_data else None
+                result = assess_strategy(evidence, quality)
+            elif research_type == "factor_report":
+                evidence = FactorEvidence(**evidence_data)
+                result = assess_factor_report(evidence)
+            else:
+                raise ValueError("research_type must be 'strategy' or 'factor_report'")
+        except (TypeError, ValueError) as exc:
+            raise click.ClickException(f"Invalid assessment: {exc}") from exc
+
+        save_assessment(conn, row["id"], evidence, result)
+        output = _assessment_payload(conn, row["id"])
+        if output_json:
+            click.echo(json.dumps(output, ensure_ascii=False, indent=2))
+        else:
+            click.echo(f"✓ {row['id']}: {result.research_type} → {result.decision}")
+            if result.rejection_reasons:
+                click.echo(f"  Reasons: {', '.join(result.rejection_reasons)}")
+            if result.quality:
+                click.echo(f"  Quality: {result.quality_score}/100")
+                from paperdb.strategy_assessment import QUALITY_MAX_POINTS
+                for name, maximum in QUALITY_MAX_POINTS.items():
+                    click.echo(f"    {name}: {getattr(result.quality, name)}/{maximum}")
+    finally:
+        conn.close()
+
+
+@assessment.command("show")
+@click.argument("paper_id")
+@click.option("--root", default=None, help="Paper database root directory")
+@click.option("--json", "output_json", is_flag=True, help="Output as JSON")
+def assessment_show(paper_id, root, output_json):
+    """Show the structured assessment, rejection reasons, and score components."""
+    r = _resolve_root(root)
+    conn, config, file_store = _get_db(r)
+    try:
+        row = conn.execute(
+            "SELECT id FROM papers WHERE id = ? OR id LIKE ?",
+            (paper_id, f"{paper_id}%"),
+        ).fetchone()
+        if not row:
+            raise click.ClickException(f"Paper not found: {paper_id}")
+        output = _assessment_payload(conn, row["id"])
+        if not output:
+            raise click.ClickException(f"No assessment for {row['id']}")
+        if output_json:
+            click.echo(json.dumps(output, ensure_ascii=False, indent=2))
+            return
+        click.echo(f"{output['paper_id']}  {output['research_type']}  {output['decision']}")
+        if output["rejection_reasons"]:
+            click.echo(f"Rejection reasons: {', '.join(output['rejection_reasons'])}")
+        if output["quality_score"] is not None:
+            click.echo(f"Quality score: {output['quality_score']}/100")
+            from paperdb.strategy_assessment import QUALITY_MAX_POINTS
+            for name, maximum in QUALITY_MAX_POINTS.items():
+                click.echo(f"  {name}: {output['quality_breakdown'][name]}/{maximum}")
+    finally:
+        conn.close()
+
+
+@assessment.command("rubric")
+def assessment_rubric():
+    """Print the visible 100-point strategy quality rubric."""
+    from paperdb.strategy_assessment import QUALITY_MAX_POINTS
+    click.echo("Qualified strategy quality rubric:")
+    for name, maximum in QUALITY_MAX_POINTS.items():
+        click.echo(f"  {name}: {maximum} points")
+    click.echo(f"  total: {sum(QUALITY_MAX_POINTS.values())} points")
+
+
+def _assessment_payload(conn, paper_id):
+    row = conn.execute(
+        "SELECT * FROM paper_assessments WHERE paper_id = ?", (paper_id,)
+    ).fetchone()
+    if not row:
+        return None
+    output = dict(row)
+    for field in ("rejection_reasons", "quality_breakdown", "evidence_json"):
+        output[field] = json.loads(output[field] or ("[]" if field == "rejection_reasons" else "{}"))
+    return output
+
+
+# ---------------------------------------------------------------------------
 # update command (modify paper fields)
 # ---------------------------------------------------------------------------
 
@@ -739,7 +906,8 @@ def label_list(root, source_filter):
 @click.option("--lifecycle-status", type=click.Choice(["active", "rejected_out_of_scope", "archived"]), default=None)
 @click.option("--metadata-quality", type=click.Choice(["verified", "partial", "suspicious"]), default=None)
 @click.option("--quality-screening-status", type=click.Choice([
-    "metadata_only", "full_text_available", "quality_screened", "insufficient_evidence"
+    "metadata_only", "full_text_available", "quality_screened", "unverified",
+    "insufficient_evidence"
 ]), default=None)
 @click.option("--github-evidence-type", default=None, help="Evidence type for GitHub URL")
 @click.option("--github-evidence-url", default=None, help="Page containing the GitHub evidence")
@@ -1161,12 +1329,16 @@ def summary_list(root, missing):
 @click.option("--label", multiple=True, help="Filter by label (repeatable)")
 @click.option("--market", default=None, help="Filter by market")
 @click.option("--source-type", "source_type_filter", default=None, help="Filter by source type")
+@click.option("--research-type", type=click.Choice(["strategy", "factor_report"]), default=None,
+              help="Filter by structured research type")
+@click.option("--decision", type=click.Choice(["qualified", "unverified"]), default=None,
+              help="Filter by active qualification decision")
 @click.option("--institution", "inst_filter", default=None, help="Filter by institution")
 @click.option("--date-from", default=None, help="Publication date from")
 @click.option("--date-to", default=None, help="Publication date to")
 @click.option("--limit", default=20, type=int, help="Max results (default: 20)")
 @click.option("--json", "output_json", is_flag=True, help="Output as JSON")
-def search_cmd(query, root, mode, label, market, source_type_filter, inst_filter,
+def search_cmd(query, root, mode, label, market, source_type_filter, research_type, decision, inst_filter,
                date_from, date_to, limit, output_json):
     """Hybrid search across papers (keyword + semantic).
 
@@ -1188,6 +1360,10 @@ def search_cmd(query, root, mode, label, market, source_type_filter, inst_filter
             filters["market"] = market
         if source_type_filter:
             filters["source_type"] = source_type_filter
+        if research_type:
+            filters["research_type"] = research_type
+        if decision:
+            filters["decision"] = decision
         if inst_filter:
             filters["institution"] = config.canonicalize_institution_filter(inst_filter)
         if date_from:
@@ -1242,6 +1418,7 @@ def search_cmd(query, root, mode, label, market, source_type_filter, inst_filter
                     "github_url": paper["github_url"],
                     "access_status": paper["access_status"],
                     "labels": [l["label"] for l in labels],
+                    "assessment": _assessment_payload(conn, paper["id"]),
                     "score": round(score, 4),
                 })
             click.echo(json.dumps({"total": len(out), "results": out}, ensure_ascii=False, indent=2))
@@ -1362,18 +1539,40 @@ def _error(msg: str, json_output: bool) -> None:
 
 def _default_taxonomy() -> dict:
     return {
-        "labels": {
-            "factor_research": "因子研究 — factor construction, testing, IC analysis, decay",
-            "strategy_research": "策略研究 — investment strategies, signal generation",
-            "asset_pricing": "资产定价 — factor models, CAPM, APT, SDF",
-            "portfolio_construction": "组合构建 — optimization, constraints, risk budgeting",
-            "risk_model": "风险模型 — covariance estimation, Barra-style",
-            "market_microstructure": "市场微观结构 — order book, bid-ask spread, market impact",
-            "trading_cost_execution": "交易成本/执行 — TCA, VWAP/TWAP, optimal execution",
-            "technical_factor": "技术因子 — indicators, technical signals, momentum/reversal patterns",
-            "value_factor": "价值因子 — valuation, profitability, quality, growth, fundamental value signals",
-            "price_and_volume_factor": "价量因子 — price/volume behavior, turnover, liquidity, volatility, order-flow signals",
-        }
+        "research_types": {
+            "strategy": "Complete investable strategy with portfolio rules and performance",
+            "factor_report": "Factor formula with backtest method and results",
+        },
+        "strategy_families": {
+            "momentum": "Momentum and relative-strength strategies",
+            "reversal": "Short- or long-horizon reversal strategies",
+            "trend_following": "Trend and moving-average timing",
+            "multi_factor_selection": "Multi-factor stock selection",
+            "fundamental_selection": "Fundamental stock selection",
+            "technical_timing": "Technical-indicator timing",
+            "volatility": "Volatility-managed strategies",
+            "event_driven": "Event-driven strategies",
+            "sector_rotation": "Sector or industry rotation",
+            "asset_allocation": "Allocation among A-share indices or index ETFs",
+            "machine_learning": "Machine-learning strategy",
+            "other": "Other medium- or low-frequency strategy",
+        },
+        "signal_families": {
+            "price_volume": "Price, volume, turnover, liquidity, or volatility",
+            "technical": "Technical indicators",
+            "fundamental": "Valuation, profitability, quality, growth, or balance-sheet data",
+            "sentiment": "Analyst, news, or investor-sentiment data",
+            "flow": "Fund-flow, northbound-flow, or holdings data",
+            "alternative_data": "Non-traditional datasets",
+            "composite": "Multiple signal families",
+        },
+        "frequency_labels": {
+            "daily": "Daily signal or rebalance; no intraday trading",
+            "weekly": "Weekly",
+            "monthly": "Monthly",
+            "quarterly": "Quarterly",
+            "lower_frequency": "Lower than quarterly",
+        },
     }
 
 
@@ -1467,7 +1666,10 @@ def arxiv_search(query, root, limit, finance_only, topic_term, market_term, outp
                 decision=assessment.decision,
                 rejection_reason=",".join(assessment.reasons) if assessment.decision == "rejected" else None,
                 relevance_score=assessment.score,
-                evidence={"categories": meta.extra.get("categories", [])},
+                evidence={
+                    "categories": meta.extra.get("categories", []),
+                    "abstract_metrics": assessment.abstract_metrics,
+                },
             )
         conn.commit()
 
@@ -1489,6 +1691,7 @@ def arxiv_search(query, root, limit, finance_only, topic_term, market_term, outp
                     "relevance_score": assessment.score,
                     "suggested_decision": assessment.decision,
                     "decision_reasons": assessment.reasons,
+                    "abstract_metrics": assessment.abstract_metrics,
                 }
                 # Check if already in DB
                 from paperdb.utils.hashing import compute_metadata_hash

@@ -132,6 +132,12 @@ class KeywordSearcher:
                 elif col == "date_to":
                     conditions.append("p.publication_date <= ?")
                     filter_params.append(val)
+                elif col in ("research_type", "decision"):
+                    conditions.append(
+                        f"""p.id IN (SELECT paper_id FROM paper_assessments
+                                     WHERE {col} = ?)"""
+                    )
+                    filter_params.append(val)
             if conditions:
                 filter_clause += " AND " + " AND ".join(conditions)
 

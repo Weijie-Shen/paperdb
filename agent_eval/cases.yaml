@@ -1,223 +1,143 @@
-version: 1
-name: paperdb_agent_eval
+version: 2
+name: paperdb_strategy_agent_eval
 description: >
-  Evaluation cases for testing whether a Hermes or AgentMatrix agent can use
-  PaperDB skills to search, ingest, classify, summarize, and manage downloads
-  correctly.
+  Evaluation cases for A-share medium/low-frequency strategy discovery,
+  full-text qualification, factor-report screening, and quality scoring.
 
 global_rules:
-  valid_research_area_labels:
-    - factor_research
-    - strategy_research
-    - asset_pricing
-    - portfolio_construction
-    - risk_model
-    - market_microstructure
-    - trading_cost_execution
-  valid_factor_family_labels:
-    - technical_factor
-    - value_factor
-    - price_and_volume_factor
-  invalid_removed_labels_must_not_appear:
-    - ml_deep_learning
-    - multi_factor
-    - backtesting
-    - style_factor
-    - alternative_data
-    - sentiment
-  required_invariants:
-    - Every ingested paper must have at least one valid research-area label.
-    - Factor-family labels are optional and must be limited to the configured three labels.
-    - Label source should default to ai_auto.
-    - Label confidence must be stored when assigned.
-    - Do not create or rely on a manual label-review queue.
-    - Do not fabricate titles, authors, institutions, GitHub URLs, or download URLs.
-    - Use metadata-first arXiv ingest unless a case explicitly asks for PDF download.
-    - Related GitHub URL may be stored only when explicitly specified by the paper, abstract page, PDF, or project page.
+  discovery:
+    - Use metadata and abstract claims only to discover and prioritize candidates.
+    - Prefer academic papers and broker reports.
+    - Reject explicit intraday and explicit non-A-share candidates.
+    - Do not fabricate titles, authors, institutions, links, or performance.
+  strategy_hard_gates:
+    - A-share stocks, A-share indices, or corresponding index ETFs only.
+    - Trading must be permitted in the A-share market.
+    - Daily or lower frequency; no intraday trading.
+    - Test period must be at least 60 months.
+    - Main-strategy annualized return must be at least 30 percent.
+    - Main-strategy maximum-drawdown magnitude must be at most 10 percent.
+    - Performance must include transaction costs.
+    - Leverage is not allowed.
+  factor_report_hard_gates:
+    - A-share universe or index.
+    - Complete implementable factor formula.
+    - Complete backtest method.
+    - Reported backtest results.
+    - IC, strategy return thresholds, and 60-month duration are not required.
+  verification:
+    - Final decisions require a downloaded full text.
+    - Missing full text must produce unverified, not qualified or rejected.
+    - Rejected papers receive reasons and no quality score.
+    - Qualified factor reports receive no strategy quality score.
+    - Qualified strategies receive all six visible score components.
+
+strategy_quality:
+  backtest_design: 25
+  transaction_cost_realism: 15
+  out_of_sample_robustness: 20
+  test_length_recency: 15
+  clarity_reproducibility: 15
+  source_credibility: 10
+  total: 100
 
 scoring:
   total_points: 100
   dimensions:
-    relevance:
-      points: 25
-      description: Ingested papers match the case topic and are not obvious false positives.
-    search_strategy:
-      points: 15
-      description: Queries are source-appropriate and include China/A-share/finance constraints where needed.
-    metadata_quality:
-      points: 15
-      description: Title, authors, date, source_url, download_url, abstract, and GitHub fields are accurate when available.
-    classification_quality:
+    discovery_precision:
       points: 20
-      description: Labels, confidence scores, market, frequency, and language are valid and defensible.
-    workflow_correctness:
-      points: 15
-      description: Uses metadata-first arXiv, deduplicates, avoids manual review queue, and delays downloads appropriately.
-    reporting_quality:
+    evidence_accuracy:
+      points: 25
+    hard_gate_correctness:
+      points: 25
+    quality_score_consistency:
+      points: 20
+    auditability:
       points: 10
-      description: Final report clearly states what was found, labels, confidence, access status, and uncertainty.
-  pass_threshold: 75
+  pass_threshold: 80
   hard_fail_conditions:
-    - Uses any invalid_removed_labels_must_not_appear label.
-    - Fabricates a GitHub URL.
-    - Downloads arXiv PDFs during discovery without explicit instruction.
-    - Reports unclassified new papers as complete.
+    - Qualifies a paper without downloaded full text.
+    - Qualifies an intraday, leveraged, or non-A-share strategy.
+    - Qualifies a strategy below 30 percent annualized return or above 10 percent drawdown.
+    - Qualifies a strategy whose reported performance excludes transaction costs.
+    - Fabricates performance evidence or source links.
 
 cases:
-  - id: a_share_factor_search
-    type: discovery_and_classification
+  - id: qualifying_a_share_strategy
+    type: discovery_download_and_screen
     priority: high
     prompt: >
-      Find 5 papers about Chinese A-share factor research. Prefer medium- or
-      low-frequency studies. Use metadata-first ingestion and classify all new
-      papers.
+      Find medium- or low-frequency A-share strategies whose main reported
+      strategy may have annualized return >=30% and maximum drawdown <=10%.
+      Download promising papers, verify the full text, and retain only papers
+      that pass every hard gate.
     expected_behavior:
-      - Generate English arXiv queries with China, Chinese stock, A-share, factor, alpha, asset pricing, or anomaly terms.
-      - Use Chinese web queries for broker/Chinese sources if web tools are available.
-      - Ingest only papers plausibly related to equity factors, anomalies, asset pricing, or quantitative stock selection.
-      - Assign factor_research to relevant factor papers.
-      - Set market to a_share when the paper is clearly about Chinese A-shares.
-      - Set frequency to daily, weekly, monthly, quarterly, low_freq, or unclear based on evidence.
-      - Keep arXiv papers queued with download_url retained unless explicitly asked to download.
+      - Search academic and broker sources using strategy, backtest, annualized-return, drawdown, and transaction-cost terms.
+      - Use abstract numbers only for candidate prioritization.
+      - Verify main-strategy identity, dates, metrics, costs, leverage, frequency, and market rules from full text.
+      - Store page/table/section evidence.
+      - Show all six quality components and the total for every qualified strategy.
     suggested_checks:
-      - paperdb query --label factor_research --market a_share --limit 20 --json
-      - paperdb download-status
-    minimum_success:
-      relevant_ingested_count: 3
-      max_obvious_false_positives: 1
+      - paperdb query --research-type strategy --decision qualified --json
+      - paperdb assessment show <paper-id> --json
 
-  - id: price_volume_technical_factors
-    type: discovery_and_classification
+  - id: inclusive_threshold_boundaries
+    type: deterministic_boundary
     priority: high
     prompt: >
-      Find papers or reports about price-volume factors, technical indicators,
-      momentum, reversal, liquidity, turnover, or volatility signals in China
-      equities. Classify with the simplified taxonomy.
+      Classify a verified 60-month A-share daily strategy with exactly 30%
+      annualized return and exactly -10% maximum drawdown, net of costs and
+      without leverage.
     expected_behavior:
-      - Use factor_research plus price_and_volume_factor when signals are based on price, volume, turnover, liquidity, volatility, or order-flow data.
-      - Use technical_factor when the paper clearly studies chart indicators, technical rules, momentum/reversal indicators, or technical analysis.
-      - Avoid old labels such as style_factor or multi_factor.
-      - Avoid classifying generic machine learning papers as factor research unless there is a finance/factor connection.
-    suggested_checks:
-      - paperdb query --label price_and_volume_factor --limit 20 --json
-      - paperdb query --label technical_factor --limit 20 --json
-    minimum_success:
-      relevant_ingested_count: 2
-      max_obvious_false_positives: 1
+      - Qualify the strategy because the thresholds are inclusive.
+      - Store drawdown magnitude as 10.
+      - Produce a six-component quality score.
 
-  - id: portfolio_risk_models
-    type: discovery_and_classification
-    priority: medium
-    prompt: >
-      Find papers relevant to portfolio construction or risk models for Chinese
-      or emerging equity markets. Classify and summarize them.
-    expected_behavior:
-      - Use portfolio_construction for optimization, allocation, constraints, risk budgeting, or portfolio formation papers.
-      - Use risk_model for covariance estimation, factor risk models, Barra-style models, risk decomposition, or risk forecasting.
-      - Use asset_pricing only when the paper is primarily about pricing models or expected returns.
-      - Set market to a_share, emerging_market, global, or unclear depending on evidence and current allowed market values.
-    suggested_checks:
-      - paperdb query --label portfolio_construction --limit 20 --json
-      - paperdb query --label risk_model --limit 20 --json
-    minimum_success:
-      relevant_ingested_count: 2
-      max_obvious_false_positives: 1
-
-  - id: github_repo_capture
-    type: metadata_quality
-    priority: high
-    prompt: >
-      Find papers in quantitative finance, factor research, portfolio
-      construction, or asset pricing that explicitly provide related GitHub
-      repositories. Ingest metadata and preserve the GitHub links.
-    expected_behavior:
-      - Search for papers with explicit code/GitHub mentions.
-      - Store github_url only when a repository link is visible in the paper metadata, abstract page, PDF, or official project page.
-      - Do not infer repositories from author names or paper titles.
-      - Report papers where no GitHub link was found separately; do not fill github_url for them.
-    suggested_checks:
-      - paperdb query --limit 100 --json
-      - Inspect records where github_url is non-null.
-    minimum_success:
-      github_links_correct_count: 2
-      fabricated_github_links: 0
-
-  - id: classify_existing_unlabeled
-    type: classification_only
-    priority: high
-    prompt: >
-      Classify up to 10 existing unlabeled papers in the database. Use the
-      current research-area labels and optional factor-family labels only.
-      Preserve confidence scores.
-    expected_behavior:
-      - Query papers once in JSON and identify records with empty labels.
-      - Read enough title/abstract metadata to assign labels defensibly.
-      - Add at least one research-area label per paper.
-      - Set market, frequency, and language when evidence is available.
-      - Use lower confidence rather than creating a manual review queue when uncertain.
-    suggested_checks:
-      - paperdb query --limit 100 --json
-      - paperdb label list
-    minimum_success:
-      classified_count: 5
-      invalid_labels: 0
-
-  - id: arxiv_noise_filter
+  - id: strategy_hard_rejections
     type: negative_control
     priority: high
     prompt: >
-      Search arXiv for factor, alpha, neural, and China-related terms, but only
-      ingest papers relevant to quantitative finance, economics, asset pricing,
-      or statistical methods applicable to finance. Avoid unrelated computer
-      vision, astrophysics, biology, or general machine learning papers.
+      Screen papers that separately use intraday trading, leverage, 59 months,
+      29.9% annualized return, 10.1% drawdown, gross-of-cost returns, or
+      non-A-share universes.
     expected_behavior:
-      - Inspect titles and abstracts before ingestion.
-      - Skip obvious non-finance false positives even if they match keywords.
-      - Explain skipped categories in the final report.
-      - Do not use PDF download during filtering.
-    suggested_checks:
-      - Review newly ingested titles and abstracts.
-      - paperdb query --source-type academic_paper --limit 20 --json
-    minimum_success:
-      max_obvious_false_positives: 1
-      skipped_noise_examples_reported: true
+      - Reject every failing paper.
+      - Store all applicable rejection reasons.
+      - Do not assign any quality score to rejected papers.
 
-  - id: delayed_download_workflow
-    type: workflow
-    priority: medium
+  - id: unavailable_full_text
+    type: verification_control
+    priority: high
     prompt: >
-      Find 3 relevant arXiv papers, ingest metadata first, classify them, and
-      then download only the papers that are clearly relevant.
+      A metadata record claims 45% annualized return and 7% drawdown, but its
+      PDF cannot be downloaded. Classify it.
     expected_behavior:
-      - Use paperdb arxiv ingest without --download during discovery.
-      - Classify/filter before download.
-      - Use paperdb download or paperdb download-missing only after relevance is established.
-      - Report access_status and download outcomes.
+      - Keep the abstract claim as discovery evidence.
+      - Classify the paper as unverified.
+      - Do not qualify, reject, or score it.
+
+  - id: a_share_factor_report
+    type: factor_report
+    priority: high
+    prompt: >
+      Find and screen A-share factor reports. Retain reports with a complete
+      factor formula, backtest method, and reported results.
+    expected_behavior:
+      - Do not require IC.
+      - Do not apply strategy return, drawdown, duration, cost, or quality-score requirements.
+      - Reject incomplete formula or incomplete backtest evidence with explicit reasons.
     suggested_checks:
-      - paperdb download-status
-      - paperdb query --access-status downloaded --limit 10 --json
-    minimum_success:
-      relevant_ingested_count: 2
-      downloaded_after_classification: true
+      - paperdb query --research-type factor_report --decision qualified --json
+
+  - id: main_strategy_not_best_variant
+    type: anti_cherry_pick
+    priority: high
+    prompt: >
+      Screen a paper whose optimized variant passes the return/drawdown gates
+      but whose author-designated baseline strategy does not.
+    expected_behavior:
+      - Use the author-designated primary/default strategy.
+      - Reject the paper rather than substituting the best parameter combination.
 
 run_record_template:
   filename: "runs/YYYY-MM-DD-<case-id>.md"
-  fields:
-    - case_id
-    - date
-    - agent_or_model
-    - database_snapshot_or_notes
-    - prompt_used
-    - queries_generated
-    - commands_or_api_calls_used
-    - papers_ingested
-    - labels_assigned
-    - github_urls_stored
-    - downloads_attempted
-    - obvious_false_positives
-    - missed_requirements
-    - scores_by_dimension
-    - final_score
-    - pass_fail
-    - notes_for_skill_improvement
-

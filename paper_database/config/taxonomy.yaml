@@ -1,11 +1,45 @@
-labels:
-  factor_research: 因子研究 — factor construction, testing, IC analysis, decay
-  strategy_research: 策略研究 — investment strategies, signal generation
-  asset_pricing: 资产定价 — factor models, CAPM, APT, SDF
-  portfolio_construction: 组合构建 — optimization, constraints, risk budgeting
-  risk_model: 风险模型 — covariance estimation, Barra-style
-  market_microstructure: 市场微观结构 — order book, bid-ask spread, market impact
-  trading_cost_execution: 交易成本/执行 — TCA, VWAP/TWAP, optimal execution
-  technical_factor: 技术因子 — indicators, technical signals, momentum/reversal patterns
-  value_factor: 价值因子 — valuation, profitability, quality, growth, fundamental value signals
-  price_and_volume_factor: 价量因子 — price/volume behavior, turnover, liquidity, volatility, order-flow signals
+research_types:
+  strategy: Complete investable strategy with portfolio rules and performance
+  factor_report: Factor formula with backtest method and results
+
+strategy_families:
+  momentum: Momentum and relative-strength strategies
+  reversal: Short- or long-horizon reversal strategies
+  trend_following: Trend and moving-average timing
+  multi_factor_selection: Multi-factor stock selection
+  fundamental_selection: Fundamental stock selection
+  technical_timing: Technical-indicator timing
+  volatility: Volatility-managed strategies
+  event_driven: Event-driven strategies
+  sector_rotation: Sector or industry rotation
+  asset_allocation: Allocation among A-share indices or index ETFs
+  machine_learning: Machine-learning strategy
+  other: Other medium- or low-frequency strategy
+
+signal_families:
+  price_volume: Price, volume, turnover, liquidity, or volatility
+  technical: Technical indicators
+  fundamental: Valuation, profitability, quality, growth, or balance-sheet data
+  sentiment: Analyst, news, or investor-sentiment data
+  flow: Fund-flow, northbound-flow, or holdings data
+  alternative_data: Non-traditional datasets
+  composite: Multiple signal families
+
+universe_labels:
+  a_share_stocks: A-share stock universe
+  csi_300: CSI 300 or corresponding ETF
+  csi_500: CSI 500 or corresponding ETF
+  csi_1000: CSI 1000 or corresponding ETF
+  other_a_share_index: Other A-share index or corresponding ETF
+
+frequency_labels:
+  daily: Daily signal or rebalance; no intraday trading
+  weekly: Weekly
+  monthly: Monthly
+  quarterly: Quarterly
+  lower_frequency: Lower than quarterly
+
+decision_labels:
+  qualified: Passed all rules using verified full text
+  rejected: Failed one or more rules
+  unverified: Full text unavailable; no final classification

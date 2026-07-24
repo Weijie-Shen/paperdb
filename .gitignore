@@ -1,0 +1,18 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.venv/
+venv/
+
+# Runtime research data is local and may contain licensed or large files.
+paper_database/db/*.sqlite
+paper_database/db/*.sqlite-*
+paper_database/files/*
+paper_database/index/*
+paper_database/logs/*
+
+# Keep runtime directory structure available after checkout.
+!paper_database/files/.gitkeep
+!paper_database/index/.gitkeep
+!paper_database/logs/.gitkeep
