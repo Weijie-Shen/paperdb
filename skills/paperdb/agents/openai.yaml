@@ -1,0 +1,4 @@
+interface:
+  display_name: "PaperDB"
+  short_description: "Operate the local and remote PaperDB system"
+  default_prompt: "Use $paperdb to operate the PaperDB local ingestion and remote publication workflow."

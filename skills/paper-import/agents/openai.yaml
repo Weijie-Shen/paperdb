@@ -1,0 +1,4 @@
+interface:
+  display_name: "Paper Import"
+  short_description: "Import and publish verified local papers"
+  default_prompt: "Use $paper-import to verify and import these local papers into PaperDB."

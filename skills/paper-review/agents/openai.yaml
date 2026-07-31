@@ -1,0 +1,4 @@
+interface:
+  display_name: "Paper Review"
+  short_description: "Review PaperDB labels and assessments"
+  default_prompt: "Use $paper-review to inspect PaperDB labels and assessment records."

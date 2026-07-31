@@ -1,0 +1,4 @@
+interface:
+  display_name: "Paper Summarize"
+  short_description: "Write faithful summaries of research papers"
+  default_prompt: "Use $paper-summarize to create concise, evidence-faithful PaperDB summaries."

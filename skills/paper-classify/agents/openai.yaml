@@ -1,0 +1,4 @@
+interface:
+  display_name: "Paper Classify"
+  short_description: "Screen and audit A-share research papers"
+  default_prompt: "Use $paper-classify to fully screen, label, and audit these PaperDB candidates."

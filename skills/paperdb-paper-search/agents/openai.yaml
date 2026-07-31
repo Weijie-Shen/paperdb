@@ -1,4 +1,0 @@
-interface:
-  display_name: "PaperDB Paper Search"
-  short_description: "Search, screen, classify, and sync papers"
-  default_prompt: "Use $paperdb-paper-search to search, fully screen, classify, audit, and sync qualified papers into PaperDB."
