@@ -16,3 +16,10 @@ paper_database/logs/*
 !paper_database/files/.gitkeep
 !paper_database/index/.gitkeep
 !paper_database/logs/.gitkeep
+
+.env
+.env.*
+!.env.example
+
+.DS_Store
+tmp/

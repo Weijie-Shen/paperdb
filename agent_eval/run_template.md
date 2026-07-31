@@ -22,7 +22,7 @@
 
 ## Strategy Evidence
 
-| Paper ID | Main strategy | Universe | Frequency | Test months | Annualized return | Max drawdown | Costs included | Leverage | A-share legal | Evidence pages/tables |
+| Paper ID | Main strategy | Universe | Frequency | Test months | Annualized return | Sharpe ratio | Costs included | Leverage | A-share legal | Evidence pages/tables |
 |---|---|---|---|---:|---:|---:|---|---|---|---|
 
 ## Factor Report Evidence

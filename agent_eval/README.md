@@ -19,7 +19,7 @@ full-text evidence, applies hard gates correctly, and preserves an audit trail.
 
 - No paper is qualified without downloaded full text.
 - Every strategy hard gate is supported by page/table/section evidence.
-- Thresholds are inclusive: annualized return >=30%, drawdown magnitude <=10%.
+- Thresholds are inclusive: annualized return >=30% and Sharpe ratio >=1.0.
 - Rejected papers have reasons and no score.
 - Qualified strategies show all six score components.
 - Factor reports use their separate completeness rules.

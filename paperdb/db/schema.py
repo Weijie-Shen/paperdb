@@ -14,7 +14,7 @@ from typing import Optional
 # ---------------------------------------------------------------------------
 # Schema version — bump when schema changes; used for future migrations
 # ---------------------------------------------------------------------------
-SCHEMA_VERSION = 4
+SCHEMA_VERSION = 5
 
 
 def _pragmas(conn: sqlite3.Connection) -> None:
@@ -201,6 +201,7 @@ CREATE TABLE IF NOT EXISTS paper_assessments (
     test_end                   TEXT,
     test_months                INTEGER,
     annualized_return          REAL,
+    sharpe_ratio               REAL,
     max_drawdown               REAL,
     transaction_costs_included INTEGER,
     transaction_cost_details   TEXT,
@@ -342,6 +343,9 @@ def _ensure_schema_compat(conn: sqlite3.Connection) -> None:
         "paper_authors": {
             "affiliation_source": "TEXT",
             "affiliation_evidence_url": "TEXT",
+        },
+        "paper_assessments": {
+            "sharpe_ratio": "REAL",
         },
     }.items():
         existing = {row["name"] for row in conn.execute(f"PRAGMA table_info({table})")}

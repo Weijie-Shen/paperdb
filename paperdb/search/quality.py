@@ -59,7 +59,7 @@ def generate_query_variants(topic: str, market: str = "China OR Chinese OR A-sha
         f'({topic_group}) AND ({clean_market}) AND '
         f'(strategy OR backtest OR portfolio OR timing) AND (cat:q-fin.ST OR cat:q-fin.PM)',
         f'({topic_group}) AND ({clean_market}) AND '
-        f'("annualized return" OR "maximum drawdown" OR "transaction cost")',
+        f'("annualized return" OR "Sharpe ratio" OR "transaction cost")',
         f'({topic_group}) AND ({clean_market}) AND '
         f'(factor OR signal OR anomaly) AND (formula OR construction OR backtest)',
     ]
@@ -83,6 +83,10 @@ def extract_performance_claims(text: str) -> dict:
         "max_drawdown": (
             r"(?:maximum drawdown|max(?:imum)?\.?\s*drawdown|最大回撤)"
             r"\s*(?:of|is|为|达到|达|:|：|=)?\s*(-?\d+(?:\.\d+)?)\s*%"
+        ),
+        "sharpe_ratio": (
+            r"(?:Sharpe(?:\s+ratio)?|夏普(?:比率|值)?)"
+            r"\s*(?:of|is|为|达到|达|:|：|=)?\s*(-?\d+(?:\.\d+)?)"
         ),
     }
     claims = {}
@@ -126,8 +130,8 @@ def assess_candidate(metadata, topic_terms: Optional[Iterable[str]] = None,
     source_type = (getattr(metadata, "source_type", None) or "").casefold()
     source_score = 1.0 if source_type in {"academic_paper", "broker_report"} else 0.25
     performance_evidence = any(term in text for term in (
-        "annualized return", "annual return", "maximum drawdown", "max drawdown",
-        "年化收益", "最大回撤", "transaction cost", "交易成本",
+        "annualized return", "annual return", "sharpe ratio", "sharpe",
+        "年化收益", "夏普比率", "夏普值", "transaction cost", "交易成本",
     ))
     abstract_metrics = extract_performance_claims(text)
     score = (

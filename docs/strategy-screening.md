@@ -32,15 +32,18 @@ The authors' primary/default strategy must satisfy every rule:
 - A-share stocks, an A-share index, or the corresponding index ETF.
 - Instruments and trading behaviour permitted in the A-share market.
 - Daily or lower frequency; no intraday signals or repeated same-day trading.
-- At least 60 months of testing.
+- At least 12 months of testing.
 - Paper-reported annualized return of at least 30%.
-- Maximum drawdown magnitude of no more than 10%.
+- Paper-reported Sharpe ratio of at least 1.0.
 - Reported performance includes transaction costs.
 - No leverage.
 
 The primary strategy is the strategy designated by the authors, otherwise the
 baseline/default principal specification. The best optimized parameter set is
 not substituted for the main strategy.
+
+Maximum drawdown may still be recorded as descriptive risk evidence, but it is
+optional and has no qualification threshold.
 
 An explicit violation of T+1, price-limit, suspension, or tradability rules is
 a rejection. Missing modelling of a market friction reduces quality, unless
@@ -49,7 +52,7 @@ case the strategy is rejected.
 
 ### Factor-report rules
 
-A factor report does not need to satisfy strategy return, drawdown, duration,
+A factor report does not need to satisfy strategy return, Sharpe, duration,
 transaction-cost, or quality-score requirements. It must:
 
 - use an A-share universe or index;
@@ -92,6 +95,15 @@ Use the following anchors consistently:
 
 Out-of-sample evidence improves the score but is not mandatory.
 
+## Rejection audit requirements
+
+For every rejected paper, store `rejection_reasons` as a list containing every
+failed hard gate found during full-text review. Do not replace specific reasons
+with a generic catch-all such as `failed_strategy_gates`. A paper that fails
+duration, Sharpe, and transaction-cost requirements must retain all three
+reasons. Keep evidence locations for each evaluated gate whenever the report
+provides them.
+
 ## Recording an assessment
 
 Strategy example:
@@ -115,6 +127,7 @@ Strategy example:
     "test_end": "2025-12",
     "test_months": 132,
     "annualized_return": 32.4,
+    "sharpe_ratio": 1.24,
     "max_drawdown": -8.7,
     "transaction_costs_included": true,
     "transaction_cost_details": "Commission, stamp duty, and 10 bps slippage",
@@ -127,7 +140,7 @@ Strategy example:
       "universe": "Section 2.2, page 6",
       "test_period": "Table 1, page 8",
       "annualized_return": "Table 6, page 18",
-      "max_drawdown": "Table 6, page 18",
+      "sharpe_ratio": "Table 6, page 18",
       "transaction_costs": "Section 4.2, page 14",
       "leverage": "Portfolio weights in Section 3.2, page 10",
       "frequency": "Section 3.3, page 11",

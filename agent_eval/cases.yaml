@@ -14,9 +14,9 @@ global_rules:
     - A-share stocks, A-share indices, or corresponding index ETFs only.
     - Trading must be permitted in the A-share market.
     - Daily or lower frequency; no intraday trading.
-    - Test period must be at least 60 months.
+    - Test period must be at least 12 months.
     - Main-strategy annualized return must be at least 30 percent.
-    - Main-strategy maximum-drawdown magnitude must be at most 10 percent.
+    - Main-strategy Sharpe ratio must be at least 1.0.
     - Performance must include transaction costs.
     - Leverage is not allowed.
   factor_report_hard_gates:
@@ -24,7 +24,7 @@ global_rules:
     - Complete implementable factor formula.
     - Complete backtest method.
     - Reported backtest results.
-    - IC, strategy return thresholds, and 60-month duration are not required.
+    - IC, strategy return thresholds, and 12-month duration are not required.
   verification:
     - Final decisions require a downloaded full text.
     - Missing full text must produce unverified, not qualified or rejected.
@@ -58,7 +58,8 @@ scoring:
   hard_fail_conditions:
     - Qualifies a paper without downloaded full text.
     - Qualifies an intraday, leveraged, or non-A-share strategy.
-    - Qualifies a strategy below 30 percent annualized return or above 10 percent drawdown.
+    - Qualifies a strategy tested for fewer than 12 months.
+    - Qualifies a strategy below 30 percent annualized return or below 1.0 Sharpe ratio.
     - Qualifies a strategy whose reported performance excludes transaction costs.
     - Fabricates performance evidence or source links.
 
@@ -68,11 +69,11 @@ cases:
     priority: high
     prompt: >
       Find medium- or low-frequency A-share strategies whose main reported
-      strategy may have annualized return >=30% and maximum drawdown <=10%.
+      strategy may have annualized return >=30% and Sharpe ratio >=1.0.
       Download promising papers, verify the full text, and retain only papers
       that pass every hard gate.
     expected_behavior:
-      - Search academic and broker sources using strategy, backtest, annualized-return, drawdown, and transaction-cost terms.
+      - Search academic and broker sources using strategy, backtest, annualized-return, Sharpe-ratio, and transaction-cost terms.
       - Use abstract numbers only for candidate prioritization.
       - Verify main-strategy identity, dates, metrics, costs, leverage, frequency, and market rules from full text.
       - Store page/table/section evidence.
@@ -85,31 +86,31 @@ cases:
     type: deterministic_boundary
     priority: high
     prompt: >
-      Classify a verified 60-month A-share daily strategy with exactly 30%
-      annualized return and exactly -10% maximum drawdown, net of costs and
+      Classify a verified 12-month A-share daily strategy with exactly 30%
+      annualized return and exactly 1.0 Sharpe ratio, net of costs and
       without leverage.
     expected_behavior:
       - Qualify the strategy because the thresholds are inclusive.
-      - Store drawdown magnitude as 10.
+      - Store the Sharpe ratio as 1.0.
       - Produce a six-component quality score.
 
   - id: strategy_hard_rejections
     type: negative_control
     priority: high
     prompt: >
-      Screen papers that separately use intraday trading, leverage, 59 months,
-      29.9% annualized return, 10.1% drawdown, gross-of-cost returns, or
+      Screen papers that separately use intraday trading, leverage, 11 months,
+      29.9% annualized return, 0.99 Sharpe ratio, gross-of-cost returns, or
       non-A-share universes.
     expected_behavior:
       - Reject every failing paper.
-      - Store all applicable rejection reasons.
+      - Store every applicable rejection reason as a list; never use a generic catch-all.
       - Do not assign any quality score to rejected papers.
 
   - id: unavailable_full_text
     type: verification_control
     priority: high
     prompt: >
-      A metadata record claims 45% annualized return and 7% drawdown, but its
+      A metadata record claims 45% annualized return and 1.4 Sharpe ratio, but its
       PDF cannot be downloaded. Classify it.
     expected_behavior:
       - Keep the abstract claim as discovery evidence.
@@ -124,7 +125,7 @@ cases:
       factor formula, backtest method, and reported results.
     expected_behavior:
       - Do not require IC.
-      - Do not apply strategy return, drawdown, duration, cost, or quality-score requirements.
+      - Do not apply strategy return, Sharpe, duration, cost, or quality-score requirements.
       - Reject incomplete formula or incomplete backtest evidence with explicit reasons.
     suggested_checks:
       - paperdb query --research-type factor_report --decision qualified --json
@@ -133,7 +134,7 @@ cases:
     type: anti_cherry_pick
     priority: high
     prompt: >
-      Screen a paper whose optimized variant passes the return/drawdown gates
+      Screen a paper whose optimized variant passes the return/Sharpe gates
       but whose author-designated baseline strategy does not.
     expected_behavior:
       - Use the author-designated primary/default strategy.

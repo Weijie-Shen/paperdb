@@ -185,10 +185,37 @@ Run `paperdb index rebuild` after bulk imports or whenever search results seem s
 | `paperdb update <paper_id> --download-url <url>` | Set or correct a delayed-download file URL |
 | `paperdb update <paper_id> --ai-summary "..."` | Update AI summary |
 
-## API Server
+## Supabase remote library
 
-The API is the shared backend surface for the future frontend and AI agent tools.
-It currently runs on the same local PaperDB SQLite database and file store.
+Supabase PostgreSQL and Storage are the authoritative shared library. The
+browser uses the Supabase Data API directly; no remotely deployed FastAPI
+server is required. Local SQLite, BGE embeddings, discovery, parsing,
+deduplication, and strategy assessment remain local.
+
+Copy `.env.example` to `.env` and configure the project URL, publishable key,
+secret/service-role key, and session-pooler URL. Keep the secret key and
+database password local; only the publishable key may be used by the browser.
+
+Apply `supabase/migrations/202607280001_paperdb_public.sql` through the Supabase
+SQL editor or a PostgreSQL migration runner. The migration creates the PaperDB
+tables, full-text search RPCs, RLS policies, and the private `paper-files`
+Storage bucket.
+
+After processing a new paper locally, upload only that selected record:
+
+```bash
+paperdb remote status
+paperdb remote sync <paper_id>
+```
+
+`remote sync` also uploads the local paper file and updates the remote record
+with its Storage object path. It does not bulk-copy the existing SQLite library.
+
+## Optional local API server
+
+FastAPI remains available as a local development and semantic-search surface.
+It continues to use the local SQLite database and file store; the public browser
+does not depend on it.
 
 Install and run:
 
@@ -221,20 +248,20 @@ Core endpoints:
 
 Interactive docs are available at `/docs` when the server is running.
 
-### Local browser UI
+### Browser UI
 
-Start the API, then run the frontend in a second terminal:
+Configure the public frontend settings, then start the site:
 
 ```bash
-paperdb-api
 cd frontend
+cp .env.example .env.local
 npm install
 npm run dev
 ```
 
-Open the local URL printed by the frontend. It connects to
-`http://127.0.0.1:8000` by default. To use a different API address, set
-`NEXT_PUBLIC_PAPERDB_API_URL` before starting the frontend.
+Replace the two placeholder values in `.env.local`. The UI calls
+`paper_facets`, `search_papers`, and `paper_detail` through the Supabase Data
+API and downloads permitted files from Storage.
 
 ## AI-Driven Operation (Hermes Skills)
 

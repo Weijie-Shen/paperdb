@@ -81,6 +81,52 @@ def main():
     """PaperDB — AI-driven paper search engine for Chinese A-share quant research."""
 
 
+@main.group()
+def remote():
+    """Interact with the remote Supabase paper library."""
+
+
+@remote.command("status")
+def remote_status():
+    """Check Data API access without reading paper contents."""
+    from dotenv import load_dotenv
+    from paperdb.supabase import SupabaseClient, SupabaseError
+
+    load_dotenv()
+    try:
+        client = SupabaseClient.from_env(write=False)
+        facets = client.rpc("paper_facets")
+    except SupabaseError as exc:
+        raise click.ClickException(str(exc)) from exc
+    click.echo(json.dumps({
+        "status": "ok",
+        "project_url": client.url,
+        "facet_groups": sorted((facets or {}).keys()),
+    }, ensure_ascii=False, indent=2))
+
+
+@remote.command("sync")
+@click.argument("paper_id")
+@click.option("--root", default=None, help="Paper database root directory")
+def remote_sync(paper_id, root):
+    """Upload one explicitly selected local paper record and its file."""
+    from dotenv import load_dotenv
+    from paperdb.supabase import SupabaseClient, SupabaseError
+    from paperdb.supabase.sync import sync_paper
+
+    load_dotenv()
+    r = _resolve_root(root)
+    conn, _config, file_store = _get_db(r)
+    try:
+        client = SupabaseClient.from_env(write=True)
+        result = sync_paper(client, conn, file_store, paper_id)
+    except SupabaseError as exc:
+        raise click.ClickException(str(exc)) from exc
+    finally:
+        conn.close()
+    click.echo(json.dumps(result, ensure_ascii=False, indent=2))
+
+
 # ---------------------------------------------------------------------------
 # init
 # ---------------------------------------------------------------------------

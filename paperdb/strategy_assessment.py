@@ -15,12 +15,12 @@ from paperdb.db.models import now_iso
 
 
 STRATEGY_MIN_ANNUAL_RETURN = 30.0
-STRATEGY_MAX_DRAWDOWN = 10.0
-STRATEGY_MIN_TEST_MONTHS = 60
+STRATEGY_MIN_SHARPE = 1.0
+STRATEGY_MIN_TEST_MONTHS = 12
 ALLOWED_FREQUENCIES = {"daily", "weekly", "monthly", "quarterly", "lower_frequency"}
 STRATEGY_EVIDENCE_KEYS = {
     "main_strategy", "universe", "test_period", "annualized_return",
-    "max_drawdown", "transaction_costs", "leverage", "frequency",
+    "sharpe_ratio", "transaction_costs", "leverage", "frequency",
     "market_rules",
 }
 
@@ -78,6 +78,7 @@ class StrategyEvidence:
     test_end: Optional[str] = None
     test_months: Optional[int] = None
     annualized_return: Optional[float] = None
+    sharpe_ratio: Optional[float] = None
     max_drawdown: Optional[float] = None
     transaction_costs_included: Optional[bool] = None
     transaction_cost_details: Optional[str] = None
@@ -137,7 +138,7 @@ def assess_strategy(
         "test_end": evidence.test_end,
         "test_months": evidence.test_months,
         "annualized_return": evidence.annualized_return,
-        "max_drawdown": evidence.max_drawdown,
+        "sharpe_ratio": evidence.sharpe_ratio,
         "transaction_costs_included": evidence.transaction_costs_included,
         "leverage_used": evidence.leverage_used,
         "intraday": evidence.intraday,
@@ -160,17 +161,14 @@ def assess_strategy(
     ):
         reasons.append("unsupported_frequency")
     if evidence.test_months is not None and evidence.test_months < STRATEGY_MIN_TEST_MONTHS:
-        reasons.append("test_period_under_60_months")
+        reasons.append("test_period_under_12_months")
     if (
         evidence.annualized_return is not None
         and evidence.annualized_return < STRATEGY_MIN_ANNUAL_RETURN
     ):
         reasons.append("annualized_return_below_30_percent")
-    if (
-        evidence.max_drawdown is not None
-        and abs(evidence.max_drawdown) > STRATEGY_MAX_DRAWDOWN
-    ):
-        reasons.append("max_drawdown_above_10_percent")
+    if evidence.sharpe_ratio is not None and evidence.sharpe_ratio < STRATEGY_MIN_SHARPE:
+        reasons.append("sharpe_ratio_below_1")
     if evidence.transaction_costs_included is False:
         reasons.append("transaction_costs_not_included")
     if evidence.leverage_used is True:
@@ -267,6 +265,7 @@ def save_assessment(conn, paper_id: str, evidence, result: AssessmentResult) -> 
         "test_end": evidence_dict.get("test_end"),
         "test_months": evidence_dict.get("test_months"),
         "annualized_return": evidence_dict.get("annualized_return"),
+        "sharpe_ratio": evidence_dict.get("sharpe_ratio"),
         "max_drawdown": (
             abs(evidence_dict["max_drawdown"])
             if evidence_dict.get("max_drawdown") is not None else None

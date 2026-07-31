@@ -38,10 +38,11 @@ def qualifying_strategy(**overrides):
         "universe": "All A-shares",
         "rebalance_frequency": "daily",
         "test_start": "2015-01",
-        "test_end": "2019-12",
-        "test_months": 60,
+        "test_end": "2015-12",
+        "test_months": 12,
         "annualized_return": 30.0,
-        "max_drawdown": -10.0,
+        "sharpe_ratio": 1.0,
+        "max_drawdown": -25.0,
         "transaction_costs_included": True,
         "leverage_used": False,
         "intraday": False,
@@ -50,7 +51,7 @@ def qualifying_strategy(**overrides):
             "universe": "Section 2",
             "test_period": "Table 1",
             "annualized_return": "Table 4",
-            "max_drawdown": "Table 4",
+            "sharpe_ratio": "Table 4",
             "transaction_costs": "Section 3.4",
             "leverage": "Section 3.2",
             "frequency": "Section 3.3",
@@ -61,10 +62,22 @@ def qualifying_strategy(**overrides):
     return StrategyEvidence(**values)
 
 
-def test_strategy_thresholds_are_inclusive_and_drawdown_is_absolute():
+def test_strategy_thresholds_are_inclusive_and_drawdown_is_not_a_gate():
     result = assess_strategy(qualifying_strategy(), quality())
     assert result.decision == "qualified"
     assert result.quality_score == 80
+
+
+def test_strategy_requires_sharpe_value_and_evidence():
+    missing_value = assess_strategy(qualifying_strategy(sharpe_ratio=None), quality())
+    assert missing_value.decision == "rejected"
+    assert "missing_sharpe_ratio" in missing_value.rejection_reasons
+
+    without_location = qualifying_strategy()
+    without_location.evidence.pop("sharpe_ratio")
+    missing_location = assess_strategy(without_location, quality())
+    assert missing_location.decision == "rejected"
+    assert "missing_evidence_sharpe_ratio" in missing_location.rejection_reasons
 
 
 @pytest.mark.parametrize(
@@ -73,9 +86,9 @@ def test_strategy_thresholds_are_inclusive_and_drawdown_is_absolute():
         ({"a_share_scope": False}, "not_a_share"),
         ({"permitted_in_a_share": False}, "violates_a_share_rules"),
         ({"intraday": True}, "intraday_strategy"),
-        ({"test_months": 59}, "test_period_under_60_months"),
+        ({"test_months": 11}, "test_period_under_12_months"),
         ({"annualized_return": 29.99}, "annualized_return_below_30_percent"),
-        ({"max_drawdown": -10.01}, "max_drawdown_above_10_percent"),
+        ({"sharpe_ratio": 0.99}, "sharpe_ratio_below_1"),
         ({"transaction_costs_included": False}, "transaction_costs_not_included"),
         ({"leverage_used": True}, "leverage_used"),
     ],
@@ -85,6 +98,26 @@ def test_strategy_hard_rejections(change, reason):
     assert result.decision == "rejected"
     assert reason in result.rejection_reasons
     assert result.quality_score is None
+
+
+def test_strategy_records_every_applicable_rejection_reason():
+    result = assess_strategy(
+        qualifying_strategy(
+            test_months=11,
+            annualized_return=29.0,
+            sharpe_ratio=0.9,
+            transaction_costs_included=False,
+            leverage_used=True,
+        ),
+        quality(),
+    )
+    assert result.rejection_reasons == [
+        "test_period_under_12_months",
+        "annualized_return_below_30_percent",
+        "sharpe_ratio_below_1",
+        "transaction_costs_not_included",
+        "leverage_used",
+    ]
 
 
 def test_missing_full_text_is_unverified_not_rejected():

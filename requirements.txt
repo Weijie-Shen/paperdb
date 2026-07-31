@@ -4,6 +4,7 @@
 # Core
 pyyaml>=6.0
 click>=8.1
+python-dotenv>=1.0
 
 # arXiv connector
 arxiv>=2.0
@@ -23,6 +24,9 @@ fastapi>=0.110
 uvicorn[standard]>=0.27
 httpx2>=0.28
 arxiv>=2.0
+
+# PostgreSQL migration runner (optional; Data API clients do not require it)
+psycopg[binary]>=3.2,<4
 
 # Dev
 pytest>=7.0

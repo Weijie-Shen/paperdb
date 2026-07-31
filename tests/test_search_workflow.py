@@ -45,9 +45,14 @@ def test_discovery_rejects_intraday_and_non_a_share_candidates():
 
 def test_abstract_performance_claims_are_only_extracted_as_evidence():
     claims = extract_performance_claims(
-        "The annualized return is 35.2% and maximum drawdown is -8.4%."
+        "The annualized return is 35.2%, maximum drawdown is -18.4%, "
+        "and Sharpe ratio is 1.25."
     )
-    assert claims == {"annualized_return": 35.2, "max_drawdown": 8.4}
+    assert claims == {
+        "annualized_return": 35.2,
+        "max_drawdown": 18.4,
+        "sharpe_ratio": 1.25,
+    }
 
 
 def test_query_variants_are_complementary_and_market_constrained():
